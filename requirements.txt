@@ -1,0 +1,15 @@
+# ---- Core scientific stack ----
+numpy>=1.26
+scipy>=1.11
+matplotlib>=3.8
+pandas>=2.1
+
+# ---- Hardware / acquisition ----
+pylablib>=1.4          # Thorlabs Zelux (CS505MU1) camera control
+
+# ---- Notebook / dev ----
+ipykernel>=6.29        # VS Code Jupyter kernel
+
+# ---- Microwave source control (uncomment if you drive the SRS over VISA) ----
+# pyvisa>=1.13
+# pyvisa-py>=0.7        # pure-Python VISA backend, if you're not using NI-VISA
