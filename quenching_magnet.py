@@ -30,15 +30,15 @@ from pylablib.devices import Thorlabs
 
 # ============================== EDIT THIS ==============================
 
-OUT_DIR  = "quenching_data"
+OUT_DIR  = "quenching_data_no_flick"
 NPZ_FILE = "quenching.npz"
 
-EXPOSURE_S = 1.9e-3   # exposure per frame
+EXPOSURE_S = 2e-3   # exposure per frame
 N_FRAMES   = 300       # frames averaged per measurement step
 
 # ROI centre in camera pixels (find in ThorCam).
-ROI_X, ROI_Y = 1137, 1287
-ROI_HALF     = 15   # window is (2*ROI_HALF+1) × (2*ROI_HALF+1)
+ROI_X, ROI_Y = 1750, 1170
+ROI_HALF     = 20   # window is (2*ROI_HALF+1) × (2*ROI_HALF+1)
 
 # =======================================================================
 
@@ -81,6 +81,10 @@ def show_distance_point(baseline, signal, quenching_frac, dist_mm, idx):
     fig, axes = plt.subplots(1, 3, figsize=(14, 4))
     fig.suptitle(f"Distance {dist_mm:.1f} mm  (point {idx + 1})", fontsize=12)
 
+    baseline       = np.rot90(baseline)
+    signal         = np.rot90(signal)
+    quenching_frac = np.rot90(quenching_frac)
+
     vmin_fl = min(baseline.min(), signal.min())
     vmax_fl = max(baseline.max(), signal.max())
 
@@ -116,25 +120,42 @@ def main():
     quenchings      = []
     quenching_fracs = []
 
-    # Resume if file already exists and ROI matches
-    expected_roi = np.array([ROI_X, ROI_Y, ROI_HALF if ROI_HALF is not None else -1])
-    if os.path.exists(npz_path):
-        d = np.load(npz_path)
+    def _try_load(path):
+        """Load distance-sweep dataset; return (baseline, distances, signals, quenchings, fracs) or None."""
+        if not os.path.exists(path):
+            return None
+        d = np.load(path)
+        if "baseline" not in d.files:
+            return None  # old per-cycle format, skip
         saved_roi = d["roi_params"]
-        if np.array_equal(saved_roi, expected_roi):
-            baseline        = d["baseline"]
-            distances       = list(d["distances"])
-            signals         = [d["signal_images"][i]     for i in range(len(distances))]
-            quenchings      = [d["quenching_images"][i]  for i in range(len(distances))]
-            quenching_fracs = [d["quenching_frac"][i]    for i in range(len(distances))]
-            print(f"Resuming — baseline loaded, {len(distances)} distance point(s) already collected.")
-        else:
-            print(f"WARNING: ROI in {npz_path} {saved_roi.tolist()} differs from current "
-                  f"{expected_roi.tolist()} — starting fresh (old file kept as-is).")
-            npz_path = os.path.join(OUT_DIR, NPZ_FILE.replace(".npz", "_prev.npz"))
-            print(f"  New data will be saved to {npz_path}")
+        if not np.array_equal(saved_roi, expected_roi):
+            return None
+        n = len(d["distances"])
+        return (
+            d["baseline"],
+            list(d["distances"]),
+            [d["signal_images"][i]    for i in range(n)],
+            [d["quenching_images"][i] for i in range(n)],
+            [d["quenching_frac"][i]   for i in range(n)],
+        )
+
+    expected_roi = np.array([ROI_X, ROI_Y, ROI_HALF if ROI_HALF is not None else -1])
+    prev_path    = os.path.join(OUT_DIR, NPZ_FILE.replace(".npz", "_prev.npz"))
+
+    loaded = _try_load(npz_path) or _try_load(prev_path)
+    if loaded:
+        baseline, distances, signals, quenchings, quenching_fracs = loaded
+        # Always save into the canonical file going forward
+        print(f"Resuming — baseline loaded, {len(distances)} distance point(s) already collected.")
     else:
-        print(f"Starting new dataset → {npz_path}")
+        if os.path.exists(npz_path):
+            import shutil, datetime
+            stamp   = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            bak     = npz_path.replace(".npz", f"_bak_{stamp}.npz")
+            shutil.copy2(npz_path, bak)
+            print(f"NOTE: ROI mismatch — old file backed up to {bak}, starting fresh.")
+        else:
+            print(f"Starting new dataset → {npz_path}")
 
     print("Connecting to Thorlabs camera ...")
     cam = Thorlabs.ThorlabsTLCamera()
