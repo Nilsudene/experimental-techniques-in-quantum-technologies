@@ -37,7 +37,7 @@ EXPOSURE_S = 2e-3   # exposure per frame
 N_FRAMES   = 300       # frames averaged per measurement step
 
 # ROI centre in camera pixels (find in ThorCam).
-ROI_X, ROI_Y = 1750, 1170
+ROI_X, ROI_Y = 1750, 1070
 ROI_HALF     = 20   # window is (2*ROI_HALF+1) × (2*ROI_HALF+1)
 
 # =======================================================================
